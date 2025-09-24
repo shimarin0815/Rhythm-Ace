@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>リズム・エース | Rhythm Ace</title>
+  <style>
+    :root{
+      --bg: radial-gradient(1200px 800px at 20% -10%, #1a237e 0%, #0d173a 40%, #070c1f 70%, #050711 100%);
+      --glass: rgba(255,255,255,.06);
+      --glass-strong: rgba(255,255,255,.12);
+      --ac: #7cf7e6; /* accent mint */
+      --ac2: #f58aff; /* neon pink */
+      --ok: #7CFC00;
+      --good: #8ad8ff;
+      --bad: #ff7a7a;
+      --text: #e8f0ff;
+      --muted: #a7b0c3;
+      --shadow: 0 30px 60px rgba(0,0,0,.45);
+      --radius: 18px;
+    }
+    html,body{height:100%;}
+    *{box-sizing:border-box}
+    body{
+      margin:0; color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      overflow:hidden;
+    }
+    .wrap{
+      display:grid; grid-template-columns: 1fr 360px; gap:18px; height:100%; padding:18px;
+    }
+    @media (max-width: 980px){
+      .wrap{grid-template-columns: 1fr; grid-template-rows: 1fr auto; padding:12px;}
+    }
+    /* Canvas area */
+    .stage-card{
+      position:relative; border-radius: var(--radius); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      box-shadow: var(--shadow); overflow:hidden; border:1px solid rgba(255,255,255,.08);
+    }
+    canvas#game{display:block; width:100%; height:100%; background: transparent;}
+
+    /* Sidebar */
+    .panel{
+      display:flex; flex-direction:column; gap:12px; padding:16px; border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.1);
+      backdrop-filter: blur(8px) saturate(130%);
+      box-shadow: var(--shadow);
+      min-height: 0;
+    }
+    .title{
+      display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.3px; font-size:20px;
+    }
+    .title-badge{ padding:4px 8px; border-radius:999px; background:linear-gradient(135deg, var(--ac), var(--ac2)); color:#0b0f23; font-weight:800; }
+
+    .section{ border-top:1px solid rgba(255,255,255,.08); padding-top:12px; }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .row>label{ font-size:12px; color:var(--muted); }
+    .row>input[type="file"]{ flex:1; }
+
+    .btn{ cursor:pointer; user-select:none; border:0; border-radius:14px; padding:10px 14px; color:#071121; font-weight:700; letter-spacing:.2px;
+      background: linear-gradient(135deg, var(--ac), var(--ac2)); box-shadow: 0 8px 18px rgba(124,247,230,.25);
+      transition: transform .08s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    .btn:hover{ filter:brightness(1.05); box-shadow: 0 10px 26px rgba(245,138,255,.24), 0 10px 26px rgba(124,247,230,.24); }
+    .btn:active{ transform: translateY(1px) scale(.997); }
+
+    .btn-ghost{ background: rgba(255,255,255,.06); color:var(--text); border:1px solid rgba(255,255,255,.09); box-shadow:none; }
+    .btn-ghost:hover{ background: rgba(255,255,255,.1); }
+
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .metrics{ display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+    .metric{ background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:10px; text-align:center; }
+    .metric b{ font-size:18px; }
+    small{ color:var(--muted); }
+
+    .prog{ width:100%; height:8px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; border:1px solid rgba(255,255,255,.1); }
+    .prog>i{ display:block; height:100%; width:0%; background: linear-gradient(90deg, var(--ac), var(--ac2)); }
+
+    .note{ font-size:12px; color:var(--muted); line-height:1.4; }
+
+    .judgetext{ position:absolute; top:22px; left:22px; display:flex; gap:10px; align-items:center; }
+    .judge{ padding:6px 10px; border-radius:12px; font-weight:800; letter-spacing:.4px; backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.12); }
+    .judge.good{ background: rgba(138,216,255,.15); color:#cbeaff; }
+    .judge.perfect{ background: rgba(124,252,0,.18); color:#d9ffd1; }
+    .judge.miss{ background: rgba(255,122,122,.12); color:#ffd6d6; }
+
+    .hud{
+      position:absolute; right:18px; top:18px; display:flex; gap:10px; align-items:center;
+    }
+    .chip{ font-weight:700; padding:8px 12px; border-radius:999px; background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
+
+    .ring{
+      position:absolute; left:50%; bottom:18px; transform: translateX(-50%);
+      width:190px; height:190px; border-radius:50%; border:2px dashed rgba(255,255,255,.15);
+      display:grid; place-items:center;
+      box-shadow: inset 0 0 30px rgba(124,247,230,.1);
+    }
+    .ring .inner{ width:150px; height:150px; border-radius:50%; border:1px solid rgba(255,255,255,.4); display:grid; place-items:center; position:relative; }
+    .ring .pulse{ position:absolute; width:100%; height:100%; border-radius:50%; border:2px solid rgba(124,247,230,.55); box-shadow:0 0 24px rgba(124,247,230,.35) inset; transform: scale(.2); opacity:.0; }
+
+    .tag{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+    .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; padding:4px 6px; border-radius:6px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
+
+    .footer{ font-size:11px; color:var(--muted); text-align:center; margin-top:4px; }
+
+    .link{ color:#d0fff6; text-decoration:underline dotted; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stage-card">
+      <canvas id="game" width="1280" height="720" aria-label="game canvas"></canvas>
+      <div class="judgetext" id="judgeBox"></div>
+      <div class="hud">
+        <div class="chip" id="scoreChip">SCORE 0</div>
+        <div class="chip" id="comboChip">COMBO ×0</div>
+        <div class="chip" id="flowChip">FLOW 0%</div>
+      </div>
+      <div class="ring" id="ring">
+        <div class="inner">
+          <div class="pulse" id="pulse"></div>
+          <div style="text-align:center">
+            <div class="tag">Beat Window</div>
+            <div><span class="kbd">SPACE</span> でタイミング</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="title"><span class="title-badge">Rhythm Ace</span> リズム・エース</div>
+
+      <div class="metrics">
+        <div class="metric"><small>BPM</small><div><b id="bpm">-</b></div></div>
+        <div class="metric"><small>BEATS</small><div><b id="beatCount">-</b></div></div>
+        <div class="metric"><small>精度</small><div><b id="acc">-</b></div></div>
+      </div>
+
+      <div class="section">
+        <div class="row">
+          <label>曲ファイル：</label>
+          <input id="file" type="file" accept="audio/*" />
+        </div>
+        <div class="row">
+          <button class="btn" id="analyzeBtn">譜面を作る（解析）</button>
+          <button class="btn btn-ghost" id="demoBtn">デモ（120BPM）</button>
+        </div>
+        <div class="prog"><i id="progBar"></i></div>
+        <div class="note">好きな曲（mp3, wav 等）を読み込んで「解析」。<br>簡易アルゴリズムでビートを推定します。</div>
+      </div>
+
+      <div class="section grid2">
+        <button class="btn" id="startBtn">▶ ゲーム開始</button>
+        <button class="btn btn-ghost" id="pauseBtn">⏸ 一時停止</button>
+      </div>
+      <div class="row">
+        <label>判定ウィンドウ(ms)</label>
+        <input id="windowMs" type="range" min="40" max="220" value="120" />
+        <span id="windowLabel" style="min-width:40px; text-align:right">120</span>
+      </div>
+
+      <div class="section">
+        <div class="row">
+          <button class="btn" id="recordBtn">🎬 リプレイ録画</button>
+          <button class="btn btn-ghost" id="downloadBtn" disabled>保存</button>
+        </div>
+        <div class="note">リプレイは**無音の短尺WebM動画**として保存します（簡易化のため音なし）。</div>
+      </div>
+
+      <div class="section">
+        <div class="note">
+          <b>操作</b>：<span class="kbd">WASD</span> / <span class="kbd">↑←↓→</span> で移動、<span class="kbd">SPACE</span> でビート合わせ＆ショット。<br>
+          ビートに合わせると <b>加速＋ロックオン拡大</b> でスタイリッシュに！
+        </div>
+      </div>
+
+      <div class="footer">UI: single-file • WebAudio + Canvas • No libraries</div>
+    </aside>
+  </div>
+
+  <script>
+  // ——————————————————————————————————————————————
+  // Utility: seeded PRNG for deterministic replays
+  // ——————————————————————————————————————————————
+  function mulberry32(a){
+    return function(){ let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  }
+
+  // ——————————————————————————————————————————————
+  // Audio + Beat Analysis (simple energy-based onset detector)
+  // ——————————————————————————————————————————————
+  const fileInput = document.getElementById('file');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const demoBtn = document.getElementById('demoBtn');
+  const progBar = document.getElementById('progBar');
+  const bpmEl = document.getElementById('bpm');
+  const beatCountEl = document.getElementById('beatCount');
+
+  let audioCtx = null;
+  let currentBuffer = null;
+  let beats = [];// seconds
+  let bpm = null;
+  let songSource = null;
+  let songStartAt = 0; // audioCtx.currentTime when started
+
+  async function decodeFile(file){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrBuf = await file.arrayBuffer();
+    const buf = await audioCtx.decodeAudioData(arrBuf);
+    return buf;
+  }
+
+  function downmixToMono(buffer){
+    const ch = buffer.numberOfChannels;
+    const len = buffer.length;
+    const data = new Float32Array(len);
+    for(let c=0;c<ch;c++){
+      const d = buffer.getChannelData(c);
+      for(let i=0;i<len;i++) data[i] += d[i]/ch;
+    }
+    return { data, sampleRate: buffer.sampleRate };
+  }
+
+  function analyzeBeats(buffer, onProgress){
+    // Very lightweight energy-based onset detection with moving average threshold.
+    const {data, sampleRate} = downmixToMono(buffer);
+    const hop = 512; // samples step
+    const frame = 1024; // samples per window
+    const n = Math.floor((data.length - frame) / hop);
+    const energy = new Float32Array(n);
+    // 1) frame energy
+    for(let i=0;i<n;i++){
+      let sum=0; const off = i*hop;
+      for(let j=0;j<frame;j++){ const v = data[off+j]; sum += v*v; }
+      energy[i]=sum;
+      if(onProgress && i%500===0) onProgress(i/n);
+    }
+    // 2) moving average & difference
+    const win = Math.floor(0.5*sampleRate / hop); // ~0.5s
+    const diff = new Float32Array(n);
+    let sum=0, q=[]; // queue of last 'win' energies
+    for(let i=0;i<n;i++){
+      sum += energy[i]; q.push(energy[i]);
+      if(q.length>win) sum -= q.shift();
+      const avg = sum / q.length;
+      const s = Math.max(0, energy[i] - avg*1.3); // threshold factor
+      diff[i] = s;
+    }
+    // 3) peak picking with refractory period
+    const minInterval = 0.25; // seconds
+    const beatsSec = [];
+    let lastBeat = -999;
+    for(let i=1;i<n-1;i++){
+      if(diff[i]>diff[i-1] && diff[i]>diff[i+1] && diff[i]>0){
+        const t = (i*hop)/sampleRate;
+        if(t - lastBeat >= minInterval){
+          beatsSec.push(t); lastBeat = t;
+        }
+      }
+    }
+    // 4) BPM estimation (median IBI)
+    if(beatsSec.length>3){
+      const ibis = [];
+      for(let i=1;i<beatsSec.length;i++) ibis.push(beatsSec[i]-beatsSec[i-1]);
+      ibis.sort((a,b)=>a-b);
+      const med = ibis[Math.floor(ibis.length/2)];
+      var estBpm = Math.max(60, Math.min(200, 60/med));
+    } else {
+      var estBpm = 120;
+    }
+    return {beats: beatsSec, bpm: Math.round(estBpm)};
+  }
+
+  // ——————————————————————————————————————————————
+  // Game Engine (Canvas 2D)
+  // ——————————————————————————————————————————————
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  canvas.tabIndex = 0; // allow focus to capture keyboard without button focusing
+  const dpr = Math.max(1, window.devicePixelRatio||1);
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+  }
+  resize(); window.addEventListener('resize', resize);
+
+  let running = false, paused=false;
+  let keys = {};
+  let score=0, combo=0, accuracyPct = 0;
+  let flow=0; // 0..1
+  let lockOnRadius=80;
+  let seed= (Math.random()*1e9)|0; let rng = mulberry32(seed);
+  const inputsLog = []; // for replay
+  let gameStartPerf = 0; // performance.now at start
+  let gameElapsed=0; // seconds
+
+  const player = {x:0, y:0, vx:0, vy:0, angle:0};
+  const bullets = []; // {x,y,vx,vy,target?}
+  const enemies = []; // {x,y,vx,vy,hp,alive}
+  const particles = [];
+
+  function resetGame(){
+    score=0; combo=0; flow=0; gameElapsed=0; player.x=0; player.y=0; player.vx=0; player.vy=0; bullets.length=0; enemies.length=0; particles.length=0;
+    seed = (Math.random()*1e9)|0; rng = mulberry32(seed); inputsLog.length=0; judgementFlash('','');
+    document.getElementById('scoreChip').textContent = 'SCORE 0';
+    document.getElementById('comboChip').textContent = 'COMBO ×0';
+    document.getElementById('flowChip').textContent = 'FLOW 0%';
+  }
+
+  function spawnEnemy(){
+    const w=canvas.width, h=canvas.height; const side = rng()<0.5? -1:1;
+    const y = (h*0.2 + rng()*h*0.6);
+    const x = side<0? w + 50 : -50;
+    const vx = side<0? -(1.2 + rng()*0.6) : (1.2 + rng()*0.6);
+    enemies.push({x,y,vx,vy:(rng()-0.5)*0.8, hp:3, alive:true});
+  }
+
+  function fireBullet(homingTarget){
+    const speed = 7 + 6*flow;
+    const b = { x: canvas.width*0.5 + player.x, y: canvas.height*0.5 + player.y, vx: speed, vy: 0, target: homingTarget||null };
+    bullets.push(b);
+  }
+
+  function addScore(base){
+    const s = Math.floor(base*(1 + combo*0.05 + flow*0.8));
+    score += s; document.getElementById('scoreChip').textContent = 'SCORE '+score;
+  }
+
+  function explode(x,y){
+    for(let i=0;i<18;i++){
+      particles.push({x,y,vx:(rng()-0.5)*6, vy:(rng()-0.5)*6, life: 40});
+    }
+  }
+
+  function nearestEnemyWithinRadius(cx,cy,r){
+    let best=null, bd=1e9; for(const e of enemies){ if(!e.alive) continue; const dx=e.x-cx, dy=e.y-cy; const d=Math.hypot(dx,dy); if(d<r && d<bd){ bd=d; best=e; } }
+    return best;
+  }
+
+  let lastSpawn=0;
+  function update(dt){
+    gameElapsed += dt;
+    // Spawns scale with flow
+    if(gameElapsed - lastSpawn > 0.9 - flow*0.5){ spawnEnemy(); lastSpawn=gameElapsed; }
+
+    // Movement
+    const accel = 0.8 + flow*0.6;
+    if(keys['ArrowUp']||keys['w']) player.vy -= accel;
+    if(keys['ArrowDown']||keys['s']) player.vy += accel;
+    if(keys['ArrowLeft']||keys['a']) player.vx -= accel;
+    if(keys['ArrowRight']||keys['d']) player.vx += accel;
+    player.vx *= 0.9; player.vy *= 0.9;
+
+    // Clamp to safe zone
+    const maxOffX = canvas.width*0.35, maxOffY = canvas.height*0.35;
+    player.x = Math.max(-maxOffX, Math.min(maxOffX, player.x + player.vx));
+    player.y = Math.max(-maxOffY, Math.min(maxOffY, player.y + player.vy));
+
+    // Enemies
+    for(const e of enemies){ if(!e.alive) continue; e.x += e.vx*(1+flow*0.4); e.y += e.vy; }
+    for(const e of enemies){ if(!e.alive) continue; if(e.x<-80||e.x>canvas.width+80||e.y<-80||e.y>canvas.height+80) e.alive=false; }
+
+    // Bullets
+    for(const b of bullets){
+      if(b.target && b.target.alive){ // homing
+        const dx=b.target.x-b.x, dy=b.target.y-b.y; const d=Math.hypot(dx,dy)+1e-6; b.vx += (dx/d)*0.6; b.vy += (dy/d)*0.6; const spd=Math.hypot(b.vx,b.vy); const lim=15+10*flow; b.vx = b.vx/spd*lim; b.vy = b.vy/spd*lim;
+      }
+      b.x += b.vx; b.y += b.vy;
+    }
+
+    // Bullet-Enemy collisions
+    for(const b of bullets){ for(const e of enemies){ if(!e.alive) continue; const dx=e.x-b.x, dy=e.y-b.y; if(dx*dx+dy*dy<20*20){ e.hp -= 1 + Math.floor(flow*2); if(e.hp<=0){ e.alive=false; explode(e.x,e.y); addScore(120); } b.x=-9999; }} }
+
+    // Particles
+    for(const p of particles){ p.x+=p.vx; p.y+=p.vy; p.vx*=0.98; p.vy*=0.98; p.life--; }
+
+    // Flow decay
+    flow = Math.max(0, flow - dt*0.25);
+    lockOnRadius = 80 + 140*flow;
+    document.getElementById('flowChip').textContent = 'FLOW '+Math.round(flow*100)+'%';
+  }
+
+  function draw(){
+    const w=canvas.width, h=canvas.height;
+    // background stars
+    ctx.clearRect(0,0,w,h);
+    ctx.save();
+    const grad = ctx.createRadialGradient(w*0.5, h*0.2, 0, w*0.5, h*0.2, h*0.9);
+    grad.addColorStop(0, 'rgba(124,247,230,0.06)');
+    grad.addColorStop(1, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,w,h);
+
+    // stars
+    ctx.globalAlpha = 0.6;
+    for(let i=0;i<120;i++){
+      const x=(i*73%w + (gameElapsed*50)%w); const y=(i*199%h);
+      ctx.fillStyle = i%9? 'rgba(255,255,255,0.5)': 'rgba(124,247,230,0.6)';
+      ctx.fillRect(w - (x%w), y, 2,2);
+    }
+    ctx.globalAlpha = 1;
+
+    // enemies
+    for(const e of enemies){ if(!e.alive) continue; ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(gameElapsed*0.2); ctx.strokeStyle='rgba(245,138,255,0.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(10,0); ctx.lineTo(0,12); ctx.lineTo(-10,0); ctx.closePath(); ctx.stroke(); ctx.restore(); }
+
+    // player ship
+    ctx.save();
+    ctx.translate(w*0.5 + player.x, h*0.5 + player.y);
+    ctx.strokeStyle = 'rgba(208,255,246,0.95)'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(22,0); ctx.lineTo(-12,-10); ctx.lineTo(-6,0); ctx.lineTo(-12,10); ctx.closePath(); ctx.stroke();
+    // lock-on reticle
+    ctx.globalAlpha=0.35; ctx.beginPath(); ctx.arc(0,0, lockOnRadius, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha=1;
+    ctx.restore();
+
+    // bullets
+    ctx.fillStyle='rgba(124,247,230,0.95)';
+    for(const b of bullets){ ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill(); }
+
+    // particles
+    for(const p of particles){ ctx.globalAlpha = Math.max(0, p.life/40); ctx.fillStyle='rgba(245,138,255,0.9)'; ctx.fillRect(p.x-2,p.y-2,4,4); }
+    ctx.globalAlpha = 1;
+
+    // UI: aim line
+    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.moveTo(w*0.5 + player.x, h*0.5 + player.y); ctx.lineTo(w, h*0.5 + player.y); ctx.stroke();
+
+    // highlight nearest enemy inside lock-on
+    const target = nearestEnemyWithinRadius(w*0.5 + player.x, h*0.5 + player.y, lockOnRadius);
+    if(target){ ctx.strokeStyle='rgba(124,247,230,0.85)'; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.arc(target.x, target.y, 26, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
+
+    ctx.restore();
+  }
+
+  // Beat Window & Judgement
+  const ring = document.getElementById('ring');
+  const pulse = document.getElementById('pulse');
+  const judgeBox = document.getElementById('judgeBox');
+  const windowSlider = document.getElementById('windowMs');
+  const windowLabel = document.getElementById('windowLabel');
+  windowSlider.addEventListener('input', ()=>{ windowLabel.textContent = windowSlider.value; });
+
+  function nearestBeatDelta(t){
+    if(!beats || beats.length===0) return {dt:Infinity, idx:-1};
+    // binary search for nearest time
+    let lo=0, hi=beats.length-1; while(lo<hi){ const mid=(lo+hi)>>1; if(beats[mid]<t) lo=mid+1; else hi=mid; }
+    let cand = lo; let bestIdx=cand; let bestDt=Math.abs(beats[cand]-t);
+    if(cand>0){ const d2=Math.abs(beats[cand-1]-t); if(d2<bestDt){ bestDt=d2; bestIdx=cand-1; } }
+    return {dt:bestDt, idx:bestIdx};
+  }
+
+  let consumedBeats = new Set();
+  let autoPulseIdx = 0; let autoPulseEnabled = true;
+  function tryJudgeAt(time){
+    const {dt, idx} = nearestBeatDelta(time);
+    const win = parseInt(windowSlider.value)/1000; // seconds
+    const good = win*1.5; // larger window for GOOD
+    if(dt<=win){ onPerfect(idx, dt); }
+    else if(dt<=good){ onGood(idx, dt); }
+    else { onMiss(); }
+  }
+
+  function judgementFlash(kind, text){
+    judgeBox.innerHTML = '';
+    if(!kind) return;
+    const d = document.createElement('div'); d.className = `judge ${kind}`; d.textContent = text; judgeBox.appendChild(d);
+    setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); }, 500);
+  }
+
+  function onPerfect(idx, dt){
+    if(consumedBeats.has(idx)) { onMiss(); return; }
+    consumedBeats.add(idx);
+    flow = Math.min(1, flow + 0.22);
+    combo++; addScore(160);
+    judgementFlash('perfect','PERFECT');
+    animatePulse();
+    document.getElementById('comboChip').textContent = 'COMBO ×'+combo;
+  }
+  function onGood(idx, dt){
+    if(consumedBeats.has(idx)) { onMiss(); return; }
+    consumedBeats.add(idx);
+    flow = Math.min(1, flow + 0.12);
+    combo++; addScore(90);
+    judgementFlash('good','GOOD');
+    animatePulse();
+    document.getElementById('comboChip').textContent = 'COMBO ×'+combo;
+  }
+  function onMiss(){
+    combo = 0; document.getElementById('comboChip').textContent = 'COMBO ×0'; judgementFlash('miss','MISS');
+  }
+
+  function animatePulse(){
+    pulse.animate([{transform:'scale(0.2)', opacity:0.0},{transform:'scale(1)', opacity:1},{transform:'scale(1.4)', opacity:0}], {duration:420, easing:'cubic-bezier(.2,.9,.15,1)'});
+  }
+
+  function currentSongTime(){
+    if(!audioCtx) return gameElapsed; // fallback
+    return Math.max(0, audioCtx.currentTime - songStartAt);
+  }
+
+  // Input handling
+  window.addEventListener('keydown', (e)=>{
+    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+    keys[e.key] = true;
+    if(!running) return;
+    const t = (performance.now() - gameStartPerf)/1000;
+    if(e.code==='Space'){
+      inputsLog.push({t, type:'space'});
+      // homing if target available
+      const cx=canvas.width*0.5 + player.x, cy=canvas.height*0.5 + player.y;
+      const tgt = nearestEnemyWithinRadius(cx,cy, lockOnRadius);
+      fireBullet(tgt);
+      tryJudgeAt(currentSongTime());
+    }
+  });
+  window.addEventListener('keyup', (e)=>{ if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault(); keys[e.key] = false; });
+
+  // Game Loop
+  let last=performance.now();
+  function loop(now){
+    const dt = Math.min(0.033, (now - last)/1000); last=now;
+    if(running && !paused){ update(dt); draw();
+      if(beats && beats.length){ const tSong = currentSongTime();
+        while(autoPulseIdx < beats.length && beats[autoPulseIdx] <= tSong){ animatePulse(); autoPulseIdx++; }
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // Start/Pause
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  startBtn.addEventListener('click', ()=>{
+    startBtn.blur(); if(canvas && canvas.focus) canvas.focus();
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    resetGame(); running=true; paused=false; gameStartPerf = performance.now();
+    // play song if available
+    if(currentBuffer){
+      if(songSource) try{ songSource.stop(); }catch(e){}
+      songSource = audioCtx.createBufferSource();
+      songSource.buffer = currentBuffer;
+      songSource.connect(audioCtx.destination);
+      songStartAt = audioCtx.currentTime + 0.05;
+      songSource.start(songStartAt);
+      autoPulseIdx = 0;
+      consumedBeats.clear?.(); consumedBeats = new Set();
+    } else {
+      // fallback: synthetic 120BPM beats
+      beats = []; const total=120; let t=0; while(t<60){ beats.push(t); t+=0.5; }
+      bpm = 120; autoPulseIdx = 0; bpmEl.textContent = bpm; beatCountEl.textContent = beats.length;
+    }
+  });
+
+  pauseBtn.addEventListener('click', ()=>{ paused = !paused; pauseBtn.textContent = paused? '▶ 再開' : '⏸ 一時停止'; pauseBtn.blur(); });
+
+  // Analyze button
+  let selectedFile=null;
+  fileInput.addEventListener('change', ()=>{ selectedFile = fileInput.files[0]||null; });
+
+  analyzeBtn.addEventListener('click', async ()=>{
+    if(!selectedFile){ alert('先に曲ファイルを選んでね！'); return; }
+    progBar.style.width = '4%';
+    try{
+      currentBuffer = await decodeFile(selectedFile);
+      progBar.style.width = '25%';
+      // Beat analysis
+      const result = analyzeBeats(currentBuffer, (p)=>{ progBar.style.width = (25 + p*65)+'%'; });
+      beats = result.beats; bpm = result.bpm; bpmEl.textContent = bpm; beatCountEl.textContent = beats.length; progBar.style.width = '100%';
+      setTimeout(()=>progBar.style.width='0%', 400);
+    }catch(e){ console.error(e); alert('解析に失敗しました…別の曲で試してみてね。'); progBar.style.width='0%'; }
+  });
+
+  // Demo button (no file)
+  demoBtn.addEventListener('click', ()=>{
+    currentBuffer = null; bpm = 120; beats=[]; for(let t=0;t<90;t+=0.5) beats.push(t);
+    bpmEl.textContent = bpm; beatCountEl.textContent = beats.length; progBar.style.width='0%'; alert('120BPMのデモ譜面を用意しました！');
+  });
+
+  // Accuracy (rough): ratio of judged beats to total pressed
+  const accEl = document.getElementById('acc');
+  let presses=0, goodPresses=0;
+  function tally(kind){ presses++; if(kind!=='miss') goodPresses++; accuracyPct = presses? Math.round(goodPresses/presses*100):0; accEl.textContent = accuracyPct+'%'; }
+  // Hook judgementFlash to tally
+  const _jf = judgementFlash; judgementFlash = (kind, text)=>{ _jf(kind, text); if(kind){ tally(kind); } };
+
+  // ——————————————————————————————————————————————
+  // Replay Recorder (silent WebM of deterministic replay)
+  // ——————————————————————————————————————————————
+  const recordBtn = document.getElementById('recordBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  let lastRun = {seed:0, inputs:[], duration:0};
+
+  // Capture last run data when pausing or before restart
+  function snapshotRun(){
+    lastRun = {seed, inputs: inputsLog.slice(), duration: gameElapsed};
+  }
+  pauseBtn.addEventListener('click', snapshotRun);
+  startBtn.addEventListener('click', snapshotRun);
+
+  recordBtn.addEventListener('click', async()=>{
+    if(lastRun.duration<=0){ alert('まずは一度プレイしてね！'); return; }
+    // Re-simulate the run while recording the canvas
+    const stream = canvas.captureStream(60);
+    const rec = new MediaRecorder(stream, {mimeType:'video/webm;codecs=vp9'});
+    const chunks=[]; rec.ondataavailable = e=> chunks.push(e.data);
+    rec.onstop = ()=>{
+      const blob = new Blob(chunks, {type:'video/webm'});
+      const url = URL.createObjectURL(blob);
+      downloadBtn.disabled = false; downloadBtn.onclick = ()=>{
+        const a = document.createElement('a'); a.href=url; a.download='RhythmAce-replay.webm'; a.click(); URL.revokeObjectURL(url);
+      };
+      downloadBtn.textContent = '保存（.webm）';
+      alert('リプレイ動画が用意できました！「保存」を押してね。');
+    };
+
+    // Setup replay
+    resetGame(); rng = mulberry32(lastRun.seed); running=true; paused=false; gameStartPerf = performance.now();
+    // No audio during replay; just visual.
+
+    let idx=0; const inputs = lastRun.inputs; const T=lastRun.duration; const start=performance.now();
+    rec.start();
+    function step(){
+      const now=performance.now(); const t=(now-start)/1000;
+      // feed logged inputs up to t
+      while(idx<inputs.length && inputs[idx].t<=t){ const ev=inputs[idx++]; if(ev.type==='space'){ const cx=canvas.width*0.5 + player.x, cy=canvas.height*0.5 + player.y; const tgt=nearestEnemyWithinRadius(cx,cy, lockOnRadius); fireBullet(tgt); tryJudgeAt(t); } }
+      update(1/60); draw();
+      if(t<T){ requestAnimationFrame(step); } else { rec.stop(); }
+    }
+    step();
+  });
+
+  </script>
+</body>
+</html>
